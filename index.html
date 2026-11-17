@@ -653,8 +653,60 @@ if(!dictChecked){
   window.claude.use('sample').then(f=>{sampleFn=f||null;dictChecked=true;if(V.name==='dict'&&!D.busy)render()})
     .catch(()=>{dictChecked=true;if(V.name==='dict')render()});
 }
+/* Claude dışında (ayrı tarayıcı sekmesinde) açılınca sözlük internetteki ücretsiz servisleri kullanır. */
+const POS_TR={noun:'isim',verb:'fiil',adjective:'sıfat',adverb:'zarf',pronoun:'zamir',preposition:'edat',conjunction:'bağlaç',interjection:'ünlem',article:'tanımlık',determiner:'belirteç',numeral:'sayı'};
+const canLookup=()=>!!sampleFn||dictChecked;
+const netErr=()=>({code:(()=>{try{return window.top!==window?'framed':'network'}catch(e){return 'framed'}})()});
+async function trText(text,single){
+  const r=await fetch('https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair=en|tr');
+  if(!r.ok)throw new Error('tr');
+  const j=await r.json();
+  const main=String((j.responseData&&j.responseData.translatedText)||'').trim();
+  if(!main||/MYMEMORY|QUERY LENGTH|INVALID/i.test(main))throw new Error('tr');
+  if(!single)return [main];
+  const out=[],low=text.toLowerCase();
+  const add=t=>{t=String(t||'').trim();if(t&&t.toLowerCase()!==low&&!out.some(x=>x.toLowerCase()===t.toLowerCase()))out.push(t)};
+  add(main);
+  (j.matches||[]).filter(m=>m&&m.translation&&String(m.segment||'').toLowerCase()===low&&String(m.translation).split(' ').length<=3)
+    .sort((a,b)=>(b.match||0)-(a.match||0)).forEach(m=>add(m.translation));
+  return out.slice(0,3);
+}
+async function webLookup(w){
+  const word=w.toLowerCase();
+  let data;
+  try{
+    const r=await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(word));
+    if(r.status===404)return {valid:false,suggest:''};
+    if(!r.ok)throw 0;
+    data=await r.json();
+  }catch(e){throw netErr()}
+  const e=Array.isArray(data)?data[0]:null;
+  if(!e)return {valid:false,suggest:''};
+  let ipa='',audio='';
+  for(const ph of (e.phonetics||[])){
+    if(!ipa&&ph.text)ipa=String(ph.text).replace(/^[\/\[]|[\/\]]$/g,'');
+    if(!audio&&ph.audio)audio=ph.audio.startsWith('//')?'https:'+ph.audio:ph.audio;
+  }
+  if(!ipa&&e.phonetic)ipa=String(e.phonetic).replace(/^[\/\[]|[\/\]]$/g,'');
+  const ms=e.meanings||[],m0=ms[0]||{};
+  const def=(m0.definitions&&m0.definitions[0]&&m0.definitions[0].definition)||'';
+  let exEn='';
+  for(const m of ms){for(const d of (m.definitions||[])){if(!exEn&&d.example)exEn=d.example}}
+  let meanings=[],exTr='';
+  try{meanings=await trText(word,true)}catch(err){}
+  if(exEn){try{exTr=(await trText(exEn,false))[0]||''}catch(err){}}
+  return {valid:true,word:e.word||word,pos:POS_TR[m0.partOfSpeech]||m0.partOfSpeech||'',meanings,ipa,say_tr:'',
+    tip:def?'İngilizce anlamı: '+def:'',ex_en:exEn,ex_tr:exTr,audio};
+}
+function playWord(r){
+  if(S.muted||!r)return;
+  if(r.audio){try{const a=new Audio(r.audio);const p=a.play();if(p&&p.catch)p.catch(()=>say(r.word));return}catch(e){}}
+  say(r.word);
+}
 function dictErr(code){
   if(['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'].includes(code))return 'Sözlük bu hesapta açık değil.';
+  if(code==='network')return 'Sözlük için internet bağlantısı gerekiyor.';
+  if(code==='framed')return 'Sözlük bu sayfada kapalı. Ayrı bir tarayıcı sekmesinde açılan dosyada çalışır.';
   if(code==='rate_limited')return 'Çok fazla kelime sordun. Biraz bekleyip tekrar dene.';
   if(code==='session_expired')return 'Oturum süresi doldu. Sayfayı yenileyip tekrar dene.';
   return 'Şu an bulamadım. Tekrar dene.';
@@ -668,16 +720,16 @@ function dictPrompt(w){
 }
 async function doLookup(w){
   w=String(w||D.q||'').trim().slice(0,40);
-  if(!w||D.busy||!sampleFn)return;
+  if(!w||D.busy||!canLookup())return;
   D.q=w;D.busy=true;D.err='';D.res=null;render();
   try{
-    const r=await sampleFn.json(dictPrompt(w),{modelTier:'quick'});
+    const r=sampleFn?await sampleFn.json(dictPrompt(w),{modelTier:'quick'}):await webLookup(w);
     if(!r||typeof r!=='object'||typeof r.word!=='string'&&r.valid!==false)throw {code:'invalid_json'};
     D.res=r;
     if(r.valid!==false&&r.word){
       const k=r.word.toLowerCase();
       D.hist=[r.word,...D.hist.filter(x=>x.toLowerCase()!==k)].slice(0,8);saveHist();
-      say(r.word);
+      playWord(r);
     }
   }catch(e){D.err=dictErr(e&&e.code)}
   D.busy=false;
@@ -686,8 +738,8 @@ async function doLookup(w){
 function dict(){
   const r=D.res,list=(r&&Array.isArray(r.meanings))?r.meanings.filter(x=>typeof x==='string'&&x):[];
   let out='';
-  if(!sampleFn){
-    out=dictChecked?'<div class="derr">Sözlük burada çalışmıyor. Sayfayı Claude içinde açman gerekiyor.</div>':'<p class="note">Sözlük hazırlanıyor...</p>';
+  if(!canLookup()){
+    out='<p class="note">Sözlük hazırlanıyor...</p>';
   }else if(D.busy){
     out='<p class="note">Aranıyor...</p>';
   }else if(D.err){
@@ -705,7 +757,7 @@ function dict(){
   }
   const hist=D.hist.length?`<h2 class="h2">Son aradıkların</h2><div class="hist">${D.hist.map(h=>`<button class="hchip" data-a="dword" data-w="${esc(h)}">${esc(h)}</button>`).join('')}</div>`:'';
   app.innerHTML=`<h1>Sözlük</h1><p class="sub">İngilizce bir kelime yaz. Anlamını ve okunuşunu bulayım.</p>
-  <form class="dform" id="dform"><input id="dq" type="text" lang="en" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" placeholder="örn. butterfly" aria-label="İngilizce kelime" value="${esc(D.q)}"><button class="btn" type="submit" ${(!sampleFn||D.busy)?'disabled':''}>Ara</button></form>
+  <form class="dform" id="dform"><input id="dq" type="text" lang="en" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="40" placeholder="örn. butterfly" aria-label="İngilizce kelime" value="${esc(D.q)}"><button class="btn" type="submit" ${(!canLookup()||D.busy)?'disabled':''}>Ara</button></form>
   ${out}${hist}`;
 }
 document.addEventListener('submit',e=>{if(e.target.id==='dform'){e.preventDefault();doLookup()}});
@@ -753,7 +805,7 @@ const ACT={
   skskip:()=>{stopRec();V.i++;V.state='idle';V.heard='';V.tries=0;V.err='';render();window.scrollTo(0,0)},
   vtest:()=>say('Hello! Cat, dog, bird.'),
   dict:()=>go('dict'),
-  dsay:()=>{if(D.res)say(D.res.word)},
+  dsay:()=>{if(D.res)playWord(D.res)},
   dword:b=>doLookup(b.dataset.w)
 };
 document.addEventListener('change',e=>{
