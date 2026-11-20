@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!doctype html>
 <html lang="tr">
 <head>
@@ -105,6 +106,22 @@ h1{font:800 clamp(28px,6.5vw,40px)/1.1 var(--f-d);margin:0 0 6px;text-wrap:balan
 .hist{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .hchip{padding:8px 14px;border-radius:999px;border:2px solid var(--line);background:var(--surface);font:800 17px/1.2 var(--f-d)}
 .hchip:active{background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
+.gsym{font:800 34px/1.1 var(--f-d)!important;overflow-wrap:anywhere}
+.tagchip{display:inline-block;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--h,var(--accent)) 24%,var(--surface));font:800 13px/1.4 var(--f-d);color:var(--ink)}
+.gcard{background:var(--surface);border:2px solid var(--line);border-radius:20px;padding:14px 16px;margin:0 0 14px}
+.gcard p{margin:0}
+.gcard.warn{border-color:color-mix(in srgb,var(--bad) 55%,var(--line));background:color-mix(in srgb,var(--bad) 9%,var(--surface))}
+.wlist{display:grid;gap:8px}
+.wrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--line);border-radius:16px;background:var(--surface)}
+.wmain{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.wmain b{font:800 22px/1.2 var(--f-d);overflow-wrap:anywhere}
+.lipa{font:700 16px/1.2 "Nunito","Segoe UI","Noto Sans","DejaVu Sans",system-ui,sans-serif;color:var(--ink2)}
+.wmain small{width:100%;color:var(--ink2);font-size:14px}
+.wbtns{display:flex;gap:6px;flex:none}
+.prow .vs{color:var(--ink2);font:800 16px/1 var(--f-d)}
+.prow{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.lhead{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.lhead .big{display:grid;place-items:center;min-width:76px;height:76px;padding:0 10px;border-radius:24px;font:800 34px/1 var(--f-d);background:color-mix(in srgb,var(--h) 26%,var(--surface))}
 .act.wide{grid-column:1/-1}
 .mic{display:inline-flex;align-items:center;gap:8px}
 .mic.on{animation:pulse 1s infinite}
@@ -256,8 +273,8 @@ const store={
   set(v){try{localStorage.setItem('kelime-kutusu',JSON.stringify(v))}catch(e){}}
 };
 const saved=store.get();
-const S={stars:saved.stars||0,mastered:saved.mastered||{},muted:!!saved.muted,voiceName:saved.voiceName||''};
-const save=()=>store.set({stars:S.stars,mastered:S.mastered,muted:S.muted,voiceName:S.voiceName});
+const S={stars:saved.stars||0,mastered:saved.mastered||{},muted:!!saved.muted,voiceName:saved.voiceName||'',guideDone:Array.isArray(saved.guideDone)?saved.guideDone:[]};
+const save=()=>store.set({stars:S.stars,mastered:S.mastered,muted:S.muted,voiceName:S.voiceName,guideDone:S.guideDone});
 function addStars(n){S.stars+=n;save();$('#starN').textContent=S.stars}
 function master(c,en){const a=S.mastered[c.id]||(S.mastered[c.id]=[]);if(!a.includes(en)){a.push(en);save()}}
 
@@ -288,12 +305,12 @@ function voicePicker(){
   if(!l.length)return '';
   return `<h2 class="h2">Ses seçimi</h2><div class="row vrow"><select id="voiceSel" aria-label="İngilizce ses">${l.map((v,i)=>`<option value="${i}" ${voice&&voice.name===v.name?'selected':''}>${v.name} (${v.lang})</option>`).join('')}</select><button class="btn alt" data-a="vtest">🔊 Dene</button></div><p class="note">Ses kötü geliyorsa listeden başka bir ses seç. Cihazın ses seviyesini de kontrol et.</p>`;
 }
-function say(t){
+function say(t,rate){
   if(!canSpeak||S.muted)return;
   try{
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(t);
-    u.lang='en-US';if(voice)u.voice=voice;u.rate=.85;u.pitch=1;u.volume=1;
+    u.lang='en-US';if(voice)u.voice=voice;u.rate=rate||.85;u.pitch=1;u.volume=1;
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -332,7 +349,7 @@ let V={name:'home'};
 const cat=()=>ALL.find(c=>c.id===V.id);
 function go(name,props){stopRec();V=Object.assign({name},props||{});render();window.scrollTo(0,0)}
 function render(){
-  ({home,menu,cards,quiz,match,spell,speak,dict})[V.name]();
+  ({home,menu,cards,quiz,match,spell,speak,dict,guide,lesson,lgame})[V.name]();
   $('#back').hidden=V.name==='home';
 }
 
@@ -347,6 +364,7 @@ function home(){
   app.innerHTML=`<h1>Hadi İngilizce öğrenelim!</h1>
   <p class="sub">Bir konu seç. Kelimeleri dinle, sonra oyunlarla pekiştir.</p>
   <button class="dictbtn" data-a="dict"><span class="ai">🔍</span><span><b>Sözlük</b><small>İstediğin kelimeyi yaz, anlamını ve okunuşunu öğren</small></span></button>
+  <button class="dictbtn" data-a="guide"><span class="ai">🗣️</span><span><b>Telaffuz Rehberi</b><small>Zor İngilizce sesleri örneklerle öğren, dinle ve dene</small></span></button>
   <div class="grid cats">${CATS.map(tileHtml).join('')}</div>
   <h2 class="h2">En çok kullanılan ${TOPW.length} kelime</h2>
   <p class="sub">Her seviyede 50 kelime ve örnek cümle var. Şimdiye kadar ${learned} / ${TOPW.length} kelimeyi öğrendin.</p>
@@ -532,6 +550,211 @@ function endScreen(r,title,text){
     <h1>${title}</h1><p>${text}</p>
     <div class="row"><button class="btn" data-a="again">Tekrar oyna</button><button class="btn alt" data-a="menu-back">Konuya dön</button></div></div>`;
   window.scrollTo(0,0);
+}
+
+/* ---------- Telaffuz Rehberi: Türkçe konuşanlar için zor sesler (ABD İngilizcesi) ----------
+   kelime: [yazılış, IPA, Türkçesi, not]   çift: [a, b] (dinleme oyunu için) */
+const GUIDE=[
+{id:'th',sym:'θ',title:'Sessiz “th”',tag:'Türkçede yok',
+ intro:'Dilin ucunu üst ve alt dişlerin arasına hafifçe koy ve havayı dışarı üfle. Ses telleri titremez.',
+ how:'Dil dişlerin arasında görünür. Havayı yavaşça dilin üstünden geçir. Dişlerini ısırma, sadece dokun.',
+ mistake:'Çoğu kişi “s” (sink) ya da “t” (tink) der. Bu anlamı değiştirir: think ve sink aynı kelime değildir.',
+ words:[['think','/θɪŋk/','düşünmek'],['three','/θriː/','üç'],['thank','/θæŋk/','teşekkür etmek'],['mouth','/maʊθ/','ağız'],['bath','/bæθ/','banyo'],['Thursday','/ˈθɜːrzdeɪ/','perşembe']],
+ pairs:[['think','sink'],['three','tree'],['thank','tank'],['mouth','mouse']],
+ tip:'Aynaya bak. Doğru söylerken dilinin ucunu dişlerin arasında görmen gerekir.'},
+{id:'dh',sym:'ð',title:'Sesli “th”',tag:'Türkçede yok',
+ intro:'Dil yine dişlerin arasında, ama bu sefer ses tellerin titrer. Elini boğazına koyunca titreşimi hissedersin.',
+ how:'Sessiz “th” ile aynı dil konumu, farkı ses telleri. the, this, that, they gibi çok sık kelimelerde bu ses var.',
+ mistake:'“Dis”, “zis” ya da “dey” demek. Dil dişlerin arasında kalmalı.',
+ words:[['the','/ðə/','belirli tanımlık'],['this','/ðɪs/','bu'],['that','/ðæt/','şu'],['mother','/ˈmʌðər/','anne'],['brother','/ˈbrʌðər/','erkek kardeş'],['together','/təˈɡɛðər/','birlikte']],
+ pairs:[['then','den'],['they','day'],['breathe','breeze'],['clothe','close']],
+ tip:'İngilizcede en sık kullanılan kelimelerin çoğunda bu ses var. Önce “the”, “this”, “that” ile çalış.'},
+{id:'wv',sym:'w / v',title:'W ve V',tag:'Türkçede karışır',
+ intro:'Çoğu kişi iki sesi de Türkçe “v” gibi söyler. İngilizcede ikisi ayrı sestir ve anlam değiştirir.',
+ how:'/w/: dudaklar yuvarlak ve öne çıkık, dişler değmez, “u” sesinden hızla sonraki sese kayarsın. /v/: üst dişler alt dudağa değer, ses telleri titrer.',
+ mistake:'wine ile vine, west ile vest aynı çıkar. W için dişini dudağına değdirme.',
+ words:[['wine','/waɪn/','şarap'],['vine','/vaɪn/','asma'],['west','/wɛst/','batı'],['vest','/vɛst/','yelek'],['water','/ˈwɔːtər/','su'],['very','/ˈvɛri/','çok']],
+ pairs:[['wine','vine'],['west','vest'],['wet','vet'],['worse','verse']],
+ tip:'W söylerken dudakların öpücük verir gibi olmalı. V söylerken alt dudağını hafifçe ısır.'},
+{id:'r',sym:'r',title:'İngilizce “r”',tag:'Türkçeden farklı',
+ intro:'Türkçe r’de dilin ucu damağa bir kez vurur. İngilizce r’de dil damağa hiç değmez.',
+ how:'Dilin ucunu geriye doğru kıvır ya da dili geriye çek. Dudaklar hafif yuvarlak. Hava dilin etrafından geçer.',
+ mistake:'Titrek “r” ile söylemek (“rrred”). Dil damağa değmemeli.',
+ words:[['red','/rɛd/','kırmızı'],['right','/raɪt/','doğru'],['car','/kɑːr/','araba'],['girl','/ɡɜːrl/','kız çocuk'],['run','/rʌn/','koşmak'],['around','/əˈraʊnd/','etrafında']],
+ pairs:[['right','light'],['road','load'],['rock','lock'],['rice','lice']],
+ tip:'Kelimenin sonundaki r de söylenir (car, girl) ama çok yumuşak, dil geride.'},
+{id:'ii',sym:'ɪ / iː',title:'Kısa i, uzun i',tag:'Uzunluk farkı',
+ intro:'Türkçede sesli harflerin uzunluğu anlam değiştirmez. İngilizcede değiştirir.',
+ how:'/ɪ/ kısa ve gevşek, “ı” ile “i” arasında. /iː/ uzun ve gergin, dudaklar hafif gülümser gibi yana gider.',
+ mistake:'ship ile sheep’i aynı söylemek. Uzun sesi uzat, kısa sesi çabuk bırak.',
+ words:[['ship','/ʃɪp/','gemi'],['sheep','/ʃiːp/','koyun'],['bit','/bɪt/','biraz'],['beat','/biːt/','vurmak'],['live','/lɪv/','yaşamak'],['leave','/liːv/','ayrılmak']],
+ pairs:[['ship','sheep'],['bit','beat'],['live','leave'],['sit','seat'],['fill','feel']],
+ tip:'“ee” ve “ea” yazılışı genellikle uzun /iː/ verir. Tek “i” genellikle kısadır.'},
+{id:'ae',sym:'æ',title:'“cat” sesi',tag:'Türkçede yok',
+ intro:'/æ/ sesi “a” ile “e” arasında bir sestir. Türkçede tam karşılığı yok.',
+ how:'Ağzını geniş aç, çeneni aşağı indir ve dilini “e” konumuna yakın tut. Dudakların yana doğru gerilir.',
+ mistake:'cat’i “ket” (e ile) ya da “kat” (a ile) demek. bad ve bed ayrımı kaybolur.',
+ words:[['cat','/kæt/','kedi'],['hat','/hæt/','şapka'],['apple','/ˈæpəl/','elma'],['man','/mæn/','adam'],['bad','/bæd/','kötü'],['bed','/bɛd/','yatak']],
+ pairs:[['bad','bed'],['man','men'],['pan','pen'],['sat','set'],['had','head']],
+ tip:'Kedi “mjav” derken ağzı nasıl açılıyorsa /æ/ için de öyle aç.'},
+{id:'uh',sym:'ʌ',title:'“cup” sesi',tag:'Türkçede yok',
+ intro:'/ʌ/ kısa ve rahat bir sestir. “a” ile “ı” arasında, ağız yarı açık.',
+ how:'Çene az açık, dudaklar gevşek, dil ortada ve rahat. Kısa bir “ah” gibi düşün.',
+ mistake:'cup’ı “kap” (a ile) ya da “kup” (u ile) demek.',
+ words:[['cup','/kʌp/','fincan'],['bus','/bʌs/','otobüs'],['love','/lʌv/','sevmek'],['sun','/sʌn/','güneş'],['money','/ˈmʌni/','para'],['son','/sʌn/','oğul','sun ile aynı okunur']],
+ pairs:[['duck','dock'],['luck','lock'],['cup','cop'],['hut','hot'],['bus','boss']],
+ tip:'“o” harfi bazen bu sesi verir: love, money, son, come.'},
+{id:'schwa',sym:'ə',title:'Schwa: en sık ses',tag:'Türkçede yok',
+ intro:'İngilizcenin en sık sesi budur. Vurgusuz hecelerde çıkar, çok kısa ve zayıftır.',
+ how:'Ağız gevşek, dil ortada. Vurgusuz hece hızlı ve hafif söylenir, neredeyse yutulur.',
+ mistake:'Her heceyi aynı güçle söylemek: “ba-na-na” yerine “bə-NA-nə”.',
+ words:[['about','/əˈbaʊt/','hakkında','ilk hece /ə/'],['banana','/bəˈnænə/','muz','1. ve 3. hece /ə/'],['teacher','/ˈtiːtʃər/','öğretmen','son hece /ər/'],['today','/təˈdeɪ/','bugün','ilk hece /ə/'],['family','/ˈfæməli/','aile','2. hece /ə/'],['the','/ðə/','belirli tanımlık','ünsüzden önce']],
+ pairs:[],
+ tip:'Vurgusuz hecede hangi harf yazılırsa yazılsın (a, e, o, u) çoğu zaman /ə/ duyulur.'},
+{id:'oo',sym:'ʊ / uː',title:'Kısa u, uzun u',tag:'Uzunluk farkı',
+ intro:'Kısa ve uzun u de anlam değiştirir, tıpkı i seslerinde olduğu gibi.',
+ how:'/ʊ/ kısa, dudaklar gevşek ve az yuvarlak. /uː/ uzun, dudaklar daha çok öne çıkık ve gergin.',
+ mistake:'book’u “buuk” diye uzatmak ya da boot ile aynı söylemek.',
+ words:[['book','/bʊk/','kitap'],['foot','/fʊt/','ayak'],['good','/ɡʊd/','iyi'],['boot','/buːt/','bot'],['food','/fuːd/','yiyecek'],['moon','/muːn/','ay']],
+ pairs:[['pull','pool'],['full','fool'],['look','Luke']],
+ tip:'“oo” yazılışı iki sesi de verebilir: book (kısa), food (uzun). Kelimeyi ezberlemek gerekir.'},
+{id:'ng',sym:'ŋ',title:'“ng” sesi',tag:'Türkçede var (bank)',
+ intro:'“ng” tek bir sestir. Dilin arkası yumuşak damağa değer ve hava burundan çıkar. Ayrıca bir “g” duyulmaz.',
+ how:'Türkçedeki “bank” ve “Ankara” sözcüklerindeki n sesi aynısıdır. Dilin ucu aşağıda kalır, arkası yukarı kalkar.',
+ mistake:'sing’i “sin-g” diye g’yi ekleyerek ya da “sin” diye n ile söylemek.',
+ words:[['sing','/sɪŋ/','şarkı söylemek'],['long','/lɔːŋ/','uzun'],['thing','/θɪŋ/','şey'],['morning','/ˈmɔːrnɪŋ/','sabah'],['thanks','/θæŋks/','teşekkürler'],['finger','/ˈfɪŋɡər/','parmak','bu kelimede g de söylenir']],
+ pairs:[['sing','sin'],['thing','thin'],['wing','win'],['king','kin']],
+ tip:'-ing ile biten kelimelerde g okunmaz: running, eating, playing.'},
+{id:'shch',sym:'ʃ / tʃ',title:'“sh” ve “ch”',tag:'Türkçede var (ş, ç)',
+ intro:'Türkçedeki ş ve ç sesleri İngilizcede de var. Bu sesler sana kolay gelecek.',
+ how:'/ʃ/ “sh” yazılır ve ş gibi okunur. /tʃ/ “ch” yazılır ve ç gibi okunur.',
+ mistake:'Yazılışa bakıp karıştırmak: school’da “ch” k okunur, chef ve machine’de ş okunur.',
+ words:[['ship','/ʃɪp/','gemi'],['shop','/ʃɑːp/','dükkân'],['fish','/fɪʃ/','balık'],['chair','/tʃɛr/','sandalye'],['cheese','/tʃiːz/','peynir'],['watch','/wɑːtʃ/','saat, izlemek']],
+ pairs:[['ship','chip'],['share','chair'],['sheep','cheap'],['wash','watch'],['shoes','choose']],
+ tip:'Kelime sonunda “-tch” de ç sesi verir: watch, catch, match.'},
+{id:'j',sym:'dʒ',title:'“j” sesi',tag:'Türkçede var (c)',
+ intro:'İngilizce j, Türkçedeki “c” sesidir. j, g ve dg harfleriyle yazılır.',
+ how:'Dilin ucu damağa dokunur, hemen bırakılır ve ses telleri titrer. “c” demek yeterli.',
+ mistake:'j’yi Fransızca “j” gibi (ž) ya da “y” gibi söylemek.',
+ words:[['jump','/dʒʌmp/','zıplamak'],['job','/dʒɑːb/','iş'],['giant','/ˈdʒaɪənt/','dev'],['bridge','/brɪdʒ/','köprü'],['age','/eɪdʒ/','yaş'],['orange','/ˈɔːrɪndʒ/','portakal']],
+ pairs:[['jeep','cheap'],['joke','choke'],['Jane','chain'],['ridge','rich']],
+ tip:'“g” e, i, y’den önce çoğu zaman j okunur: giant, gym, age. Ama give, get, girl istisnadır.'},
+{id:'zh',sym:'ʒ',title:'“television” sesi',tag:'Türkçede var (j)',
+ intro:'Bu ses Türkçedeki “j” (jüri, garaj) ile aynıdır. İngilizcede sadece birkaç kelimede çıkar.',
+ how:'/ʃ/ ile aynı ağız konumu, ama ses telleri titrer.',
+ mistake:'“tilevizyon” gibi z ile ya da “televicin” gibi c ile söylemek.',
+ words:[['television','/ˈtɛləˌvɪʒən/','televizyon'],['vision','/ˈvɪʒən/','görüş'],['measure','/ˈmɛʒər/','ölçmek'],['usually','/ˈjuːʒuəli/','genellikle'],['treasure','/ˈtrɛʒər/','hazine']],
+ pairs:[],
+ tip:'-sion ve -sure ile biten kelimelerde sık görülür: decision, pleasure, casual.'},
+{id:'plural',sym:'-s',title:'Çoğul ve -s sonu',tag:'Kural',
+ intro:'Çoğul eki ve fiildeki “-s” üç farklı sesle söylenir. Türkçede böyle bir kural yok.',
+ how:'Sessiz bir sesten sonra /s/ (cats). Sesli bir sesten sonra /z/ (dogs, days). s, z, sh, ch, j sesinden sonra fazladan bir hece /ɪz/ (boxes).',
+ mistake:'Hepsini /s/ gibi söylemek. dogs ve days’de z duyulmalı.',
+ words:[['cats','/kæts/','kediler','/s/'],['books','/bʊks/','kitaplar','/s/'],['dogs','/dɔːɡz/','köpekler','/z/'],['days','/deɪz/','günler','/z/'],['boxes','/ˈbɑːksɪz/','kutular','/ɪz/, 2 hece'],['watches','/ˈwɑːtʃɪz/','saatler','/ɪz/, 2 hece']],
+ pairs:[],
+ tip:'Elini boğazına koy. dogs derken sonda titreşim hissedersin, cats derken hissetmezsin.'},
+{id:'sz',sym:'s / z',title:'“s” harfi z okunur',tag:'Yazım tuzağı',
+ intro:'Türkçede s ve z ayrı seslerdir, İngilizcede de öyle. Ama “s” harfi bazen z sesi verir.',
+ how:'İki ünlü arasındaki s ve sondaki s çoğu zaman /z/ okunur: is, his, easy, rose.',
+ mistake:'is ve his’i “is” ve “his” diye s ile söylemek. Doğrusu “iz” ve “hiz”.',
+ words:[['is','/ɪz/','-dir, -dır'],['his','/hɪz/','onun'],['easy','/ˈiːzi/','kolay'],['rose','/roʊz/','gül'],['use','/juːs/ ~ /juːz/','kullanmak, kullanım','isim s, fiil z']],
+ pairs:[['ice','eyes'],['bus','buzz'],['price','prize'],['race','raise']],
+ tip:'Aynı kelime isim ve fiil olduğunda ses değişebilir: use /juːs/ (isim), use /juːz/ (fiil).'},
+{id:'ed',sym:'-ed',title:'Geçmiş zaman “-ed”',tag:'Kural',
+ intro:'Geçmiş zaman eki “-ed” üç farklı sesle söylenir. Çoğu zaman “e” harfi okunmaz ve ek ayrı bir hece olmaz.',
+ how:'Sessiz sesten sonra /t/ (walked). Sesli sesten sonra /d/ (played). t ya da d sesinden sonra /ɪd/ (wanted) ve fazladan bir hece eklenir.',
+ mistake:'walked’i “walk-ed” iki hece söylemek. Doğrusu tek hece: “wokt”.',
+ words:[['walked','/wɔːkt/','yürüdü','/t/, 1 hece'],['looked','/lʊkt/','baktı','/t/, 1 hece'],['played','/pleɪd/','oynadı','/d/, 1 hece'],['opened','/ˈoʊpənd/','açtı','/d/, 2 hece'],['wanted','/ˈwɑːntɪd/','istedi','/ɪd/, 2 hece'],['needed','/ˈniːdɪd/','ihtiyaç duydu','/ɪd/, 2 hece']],
+ pairs:[],
+ tip:'Kelimedeki hece sayısını say: walked 1, wanted 2. Eğer fazladan hece varsa /ɪd/ vardır.'},
+{id:'silent',sym:'…',title:'Okunmayan harfler',tag:'Yazım tuzağı',
+ intro:'İngilizcede yazım ve okunuş çoğu zaman farklıdır. Bazı harfler yazılır ama okunmaz.',
+ how:'Sık görülen kalıplar: kn- (k okunmaz), wr- (w okunmaz), -mb (b okunmaz), l (half, walk), h (hour), t (listen).',
+ mistake:'Her harfi okumak: “knife” için “k-nayf” demek. Doğrusu “nayf”.',
+ words:[['knife','/naɪf/','bıçak','k okunmaz'],['know','/noʊ/','bilmek','k okunmaz'],['write','/raɪt/','yazmak','w okunmaz'],['climb','/klaɪm/','tırmanmak','b okunmaz'],['listen','/ˈlɪsən/','dinlemek','t okunmaz'],['Wednesday','/ˈwɛnzdeɪ/','çarşamba','d okunmaz'],['island','/ˈaɪlənd/','ada','s okunmaz'],['hour','/ˈaʊər/','saat (süre)','h okunmaz'],['half','/hæf/','yarım','l okunmaz']],
+ pairs:[],
+ tip:'Yeni bir kelime öğrenirken yazılışını değil, sesini duyup öğren. Sonra yazılışa bak.'},
+{id:'stress',sym:'ˈ',title:'Kelime vurgusu',tag:'Türkçeden farklı',
+ intro:'İngilizcede her kelimede bir hece daha güçlü, uzun ve yüksek söylenir. Vurgu yanlışsa kelime anlaşılmaz.',
+ how:'Vurgulu heceyi daha yüksek, daha uzun ve daha net söyle. Vurgusuz heceler kısa ve zayıf olur, çoğu zaman /ə/ çıkar.',
+ mistake:'Türkçede vurgu çoğunlukla sondadır (kitAP, öğretMEN). İngilizcede yer değişir.',
+ words:[['banana','/bəˈnænə/','muz','ba-NA-na'],['teacher','/ˈtiːtʃər/','öğretmen','TEA-cher'],['computer','/kəmˈpjuːtər/','bilgisayar','com-PU-ter'],['family','/ˈfæməli/','aile','FA-mi-ly'],['hotel','/hoʊˈtɛl/','otel','ho-TEL'],['important','/ɪmˈpɔːrtənt/','önemli','im-POR-tant'],['photograph','/ˈfoʊtəɡræf/','fotoğraf','PHO-to-graph'],['photographer','/fəˈtɑːɡrəfər/','fotoğrafçı','pho-TO-gra-pher']],
+ pairs:[],
+ tip:'photograph ve photographer aynı kökten gelir ama vurgu yer değiştirir. Yeni kelimede vurgulu heceyi de ezberle.'},
+{id:'traps',sym:'ough',title:'Yazım tuzakları',tag:'Yazım tuzağı',
+ intro:'Aynı harf grubu farklı kelimelerde farklı okunur. En ünlü örnek “ough” grubudur.',
+ how:'Bu kelimelerin okunuşunu tek tek ezberlemek gerekir. Kalıp kuralı yoktur.',
+ mistake:'through, though, tough, cough, thought kelimelerini aynı kafiyeli okumak.',
+ words:[['through','/θruː/','içinden'],['though','/ðoʊ/','rağmen'],['tough','/tʌf/','sert, zor'],['cough','/kɔːf/','öksürmek'],['thought','/θɔːt/','düşündü'],['bread','/brɛd/','ekmek','“ea” kısa e'],['great','/ɡreɪt/','harika','“ea” ey'],['eat','/iːt/','yemek','“ea” uzun i'],['school','/skuːl/','okul','“ch” k okunur'],['chef','/ʃɛf/','şef','“ch” ş okunur']],
+ pairs:[],
+ tip:'Çok kelimeli tuzaklar için en iyi yol bol dinlemek ve kelimeyi sesli tekrar etmektir.'}
+];
+GUIDE.forEach((g,i)=>g.hue=['#2D8CF0','#2FB36D','#E3A908','#F28C28','#E8505B','#9B5DE5','#12A5A5','#EE6FA0','#B5651D','#5C6BC0'][i%10]);
+
+function sayPair(a,b){
+  if(!canSpeak||S.muted)return;
+  try{
+    speechSynthesis.cancel();
+    [a,b].forEach(t=>{const u=new SpeechSynthesisUtterance(t);u.lang='en-US';if(voice)u.voice=voice;u.rate=.7;speechSynthesis.speak(u)});
+  }catch(e){}
+}
+function guide(){
+  app.innerHTML=`<h1>Telaffuz Rehberi</h1>
+  <p class="sub">Türkçe konuşanların en çok zorlandığı İngilizce sesler. Her derste anlatım, örnek kelimeler ve dinleme oyunu var. Okunuşlar ABD İngilizcesine göredir.</p>
+  <div class="grid cats">${GUIDE.map(g=>`<button class="tile" style="--h:${g.hue}" data-a="lesson" data-id="${g.id}">
+    <span class="ico gsym">${esc(g.sym)}</span><span class="tn">${esc(g.title)}</span><span class="te">${esc(g.tag)}</span>
+    <span class="tp">${S.guideDone.includes(g.id)?'✓ Tamamlandı':(g.pairs.length?'Dinleme oyunu var':'Anlatım ve örnekler')}</span></button>`).join('')}</div>
+  <p class="note">${canSpeak?'Sesleri cihazın İngilizce sesi okur. Ses kalitesi cihaza göre değişir. Ana sayfadan başka bir ses seçebilirsin.':'Bu cihazda sesli okuma yok. Anlatımları okuyabilirsin ama sesleri dinleyemezsin.'}</p>`;
+}
+function lesson(){
+  const g=GUIDE.find(x=>x.id===V.lid);
+  const words=g.words.map(w=>`<div class="wrow"><div class="wmain"><b>${esc(w[0])}</b><span class="lipa">${esc(w[1])}</span><small>${esc(w[2])}${w[3]?' · '+esc(w[3]):''}</small></div>
+    <div class="wbtns"><button class="hchip" data-a="lsay" data-w="${esc(w[0])}" aria-label="${esc(w[0])} dinle">🔊</button><button class="hchip" data-a="lsay" data-r="slow" data-w="${esc(w[0])}" aria-label="${esc(w[0])} yavaş dinle">🐢</button></div></div>`).join('');
+  app.innerHTML=`<div class="lhead" style="--h:${g.hue}"><span class="big">${esc(g.sym)}</span><div><h1>${esc(g.title)}</h1><span class="tagchip" style="--h:${g.hue}">${esc(g.tag)}</span></div></div>
+  <div class="gcard"><p>${esc(g.intro)}</p></div>
+  <h2 class="h2">Nasıl söylenir?</h2><div class="gcard"><p>${esc(g.how)}</p></div>
+  <h2 class="h2">Sık yapılan hata</h2><div class="gcard warn"><p>${esc(g.mistake)}</p></div>
+  <h2 class="h2">Örnek kelimeler</h2><div class="wlist">${words}</div>
+  ${g.pairs.length?`<h2 class="h2">Karşılaştır</h2><p class="sub">Her çiftte iki kelime birbirine çok benzer. Sırayla dinle ve farkı duy.</p><div class="wlist">${g.pairs.map(p=>`<div class="wrow prow"><button class="hchip" data-a="lsay" data-w="${esc(p[0])}">🔊 ${esc(p[0])}</button><span class="vs">ve</span><button class="hchip" data-a="lsay" data-w="${esc(p[1])}">🔊 ${esc(p[1])}</button><button class="hchip" data-a="lpair" data-w1="${esc(p[0])}" data-w2="${esc(p[1])}">▶ İkisi</button></div>`).join('')}</div>
+  <div class="row nav"><button class="btn big" data-a="lgame-start" ${canSpeak?'':'disabled'}>🎧 Dinle ve seç</button></div>`:''}
+  <h2 class="h2">İpucu</h2><div class="gcard"><p>${esc(g.tip)}</p></div>`;
+}
+function startLGame(lid){
+  const g=GUIDE.find(x=>x.id===lid);
+  if(!g||!g.pairs.length||!canSpeak)return;
+  const pool=shuffle(g.pairs),rounds=[];
+  for(let i=0;i<6;i++){const p=pool[i%pool.length];rounds.push({target:p[Math.random()<.5?0:1],opts:shuffle(p)})}
+  V={name:'lgame',lid,rounds,i:0,score:0,ans:null};
+  render();window.scrollTo(0,0);
+  say(rounds[0].target,.7);
+}
+function lgame(){
+  const g=GUIDE.find(x=>x.id===V.lid),n=V.rounds.length;
+  if(V.i>=n){
+    const r=V.score===n?3:V.score>=n*.7?2:V.score>0?1:0;
+    sfx.win();
+    if(V.score>=Math.ceil(n*.7)&&!S.guideDone.includes(V.lid)){S.guideDone.push(V.lid);save()}
+    app.innerHTML=`<div class="flash result"><div class="big-stars" aria-label="${r} yıldız">${stars(r,3)}</div><h1>${V.score} / ${n} doğru</h1>
+      <p>${V.score>=Math.ceil(n*.7)?'Sesleri iyi ayırıyorsun. Ders tamamlandı.':'Dersteki örnekleri bir daha dinleyip tekrar dene. Kulak zamanla alışır.'}</p>
+      <div class="row"><button class="btn" data-a="lgame-start">Tekrar oyna</button><button class="btn alt" data-a="lesson-back">Derse dön</button></div></div>`;
+    return;
+  }
+  const q=V.rounds[V.i];
+  app.innerHTML=`<div class="top" style="--h:${g.hue}"><span class="chip">Soru ${V.i+1} / ${n}</span><span class="bar wide"><i style="width:${V.i/n*100}%"></i></span></div>
+  <div class="flash"><button class="btn big" data-a="lplay">🔊 Dinle</button><p class="q">Hangisini duydun?</p></div>
+  <div class="grid opts">${q.opts.map((o,k)=>`<button class="opt" data-a="lans" data-k="${k}">${esc(o)}</button>`).join('')}</div><div id="fb"></div>`;
+}
+function lAnswer(k){
+  if(V.ans!==null)return;
+  V.ans=k;
+  const q=V.rounds[V.i],ok=q.opts[k]===q.target;
+  document.querySelectorAll('.opt').forEach((el,j)=>{
+    el.disabled=true;
+    if(q.opts[j]===q.target)el.classList.add('ok');else if(j===k)el.classList.add('no');
+  });
+  if(ok){V.score++;addStars(1);sfx.ok()}else sfx.no();
+  $('#fb').innerHTML=`<div class="fb ${ok?'good':'bad'}"><div><b>${ok?'Doğru! +1 ⭐':'Bu sefer olmadı'}</b><span>Duyduğun kelime: ${esc(q.target)}</span></div>
+    <button class="btn" data-a="lnext">${V.i===V.rounds.length-1?'Sonucu gör':'Devam →'}</button></div>`;
 }
 
 /* ---------- Söyle: mikrofonla telaffuz denemesi ---------- */
@@ -766,7 +989,7 @@ document.addEventListener('input',e=>{if(e.target.id==='dq')D.q=e.target.value})
 /* ---------- Tıklamalar ---------- */
 const ACT={
   home:()=>go('home'),
-  back:()=>(V.name==='menu'||V.name==='dict')?go('home'):go('menu',{id:V.id}),
+  back:()=>V.name==='lesson'?go('guide'):V.name==='lgame'?go('lesson',{lid:V.lid}):(V.name==='menu'||V.name==='dict'||V.name==='guide')?go('home'):go('menu',{id:V.id}),
   mute:()=>{S.muted=!S.muted;save();setMute();if(S.muted&&canSpeak){try{speechSynthesis.cancel()}catch(e){}}},
   menu:b=>go('menu',{id:b.dataset.id}),
   'menu-back':()=>go('menu',{id:V.id}),
@@ -800,6 +1023,15 @@ const ACT={
   skip:()=>nextSpell(),
   again:()=>({quiz:startQuiz,match:startMatch,spell:startSpell,speak:startSpeak})[V.name](),
   mic:()=>micToggle(),
+  guide:()=>go('guide'),
+  lesson:b=>go('lesson',{lid:b.dataset.id}),
+  'lesson-back':()=>go('lesson',{lid:V.lid}),
+  lsay:b=>say(b.dataset.w,b.dataset.r==='slow'?.5:undefined),
+  lpair:b=>sayPair(b.dataset.w1,b.dataset.w2),
+  'lgame-start':()=>startLGame(V.lid),
+  lplay:()=>say(V.rounds[V.i].target,.7),
+  lans:b=>lAnswer(+b.dataset.k),
+  lnext:()=>{V.i++;V.ans=null;render();window.scrollTo(0,0);if(V.i<V.rounds.length)say(V.rounds[V.i].target,.7)},
   'say-sk':()=>{if(V.ws)say(V.ws[V.i].en)},
   sknext:()=>{V.i++;V.state='idle';V.heard='';V.tries=0;V.err='';render();window.scrollTo(0,0)},
   skskip:()=>{stopRec();V.i++;V.state='idle';V.heard='';V.tries=0;V.err='';render();window.scrollTo(0,0)},
@@ -828,3 +1060,5 @@ render();
 
 </body>
 </html>
+
+</body></html>
